@@ -17,10 +17,15 @@ from openpyxl.styles import Font, Alignment, PatternFill
 API_TOKEN = 'ZE1HOU1BcE9UNVk=|1782085439|ygCv5CrNibKxK1yz4beV84m4h6KMVD8Zf2ae/KCP33o='
 BASE_URL = 'https://platform.quip-amazon.com'
 QUIP_SOURCES = {
-    'Q1': {'id': 'tP7kA63aBaaR', 'name': 'JC Q1'},
-    'Q2': {'id': 'BbaaAYz9OOQ7', 'name': 'JC Q2'},
-    'Q3': {'id': 'b0w8Awc6xyjW', 'name': 'JC Q3'},
-    'Q4': {'id': 'o3q3AgLHlYn2', 'name': 'JC Q4'}
+    '2025_Q1': {'id': 'tP7kA63aBaaR', 'name': 'JC Q1 2025'},
+    '2025_Q2': {'id': 'BbaaAYz9OOQ7', 'name': 'JC Q2 2025'},
+    '2025_Q3': {'id': 'b0w8Awc6xyjW', 'name': 'JC Q3 2025'},
+    '2025_Q4': {'id': 'o3q3AgLHlYn2', 'name': 'JC Q4 2025'},
+    # 2026 Sources
+    '2026_Q1': {'id': 'IvhXAG3KcCug', 'name': 'JC Q1 2026'},
+    '2026_Q2': {'id': 'SFxdAl8S3zc3', 'name': 'JC Q2 2026'},
+    '2026_Q3': {'id': 'Un2jA4qLCYaO', 'name': 'JC Q3 2026'},
+    '2026_Q4': {'id': '9RajAh6HjK6a', 'name': 'JC Q4 2026'}
 }
 
 def fetch_quip_data(quarter):
@@ -1188,7 +1193,7 @@ def main():
     st.markdown(
         """
         <div style='text-align: center'>
-            <p>JC Tracker Data Analysis Tool v1.0 | Last Updated: October 2025</p>
+            <p>JC Tracker Data Analysis Tool v1.0 | Last Updated: December 2025</p>
         </div>
         """,
         unsafe_allow_html=True
