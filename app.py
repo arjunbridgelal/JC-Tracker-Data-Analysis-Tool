@@ -60,6 +60,8 @@ def get_available_tables(quip_data):
     table_titles = []
     for table in tables:
         title = table.get('title', '').strip()
+        # Check how tables are titled in 2026 documents
+        print(f"Found table title: {title}")  # Add this for debugging
         if title.startswith('WK'):
             table_titles.append(title)
     
@@ -1193,7 +1195,7 @@ def main():
     st.markdown(
         """
         <div style='text-align: center'>
-            <p>JC Tracker Data Analysis Tool v1.0 | Last Updated: December 2025</p>
+            <p>JC Tracker Data Analysis Tool v1.0 | Last Updated: October 2025</p>
         </div>
         """,
         unsafe_allow_html=True
