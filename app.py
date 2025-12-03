@@ -1195,7 +1195,7 @@ def main():
     st.markdown(
         """
         <div style='text-align: center'>
-            <p>JC Tracker Data Analysis Tool v1.0 | Last Updated: October 2025</p>
+            <p>JC Tracker Data Analysis Tool v1.0 | Last Updated: November 2025</p>
         </div>
         """,
         unsafe_allow_html=True
