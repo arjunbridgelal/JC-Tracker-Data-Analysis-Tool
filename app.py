@@ -90,11 +90,11 @@ def parse_quip_data(quip_data_dict, selected_quarters, selected_weeks):
                             'Station': cells[1].text.strip(),          
                             'Status': cells[2].text.strip(),           
                             'OFD': cells[3].text.strip(),             
-                            'Business_Type': cells[5].text.strip(),                          
-                            'Chain': cells[8].text.strip(),          
-                            'A Owner': cells[9].text.strip(),        
-                            'Category': cells[12].text.strip(),
-                            'Type': cells[12].text.strip(),
+                            'Business_Type': cells[6].text.strip(),                          
+                            'Chain': cells[9].text.strip(),          
+                            'A Owner': cells[10].text.strip(),        
+                            'Category': cells[13].text.strip(),
+                            'Type': cells[13].text.strip(),
                             'Timestamp': timestamp
                         }
                         # Additional check to filter out header row values
