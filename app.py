@@ -91,7 +91,7 @@ def parse_quip_data(quip_data_dict, selected_quarters, selected_weeks):
                             'Status': cells[2].text.strip(),           
                             'OFD': cells[3].text.strip(),             
                             'Business_Type': cells[6].text.strip(),                          
-                            'Chain': cells[9].text.strip(),          
+                            'Chain': cells[13].text.strip(),          
                             'A Owner': cells[14].text.strip(),        
                             'Category': cells[17].text.strip(),
                             'Type': cells[17].text.strip(),
