@@ -90,12 +90,11 @@ def parse_quip_data(quip_data_dict, selected_quarters, selected_weeks):
                             'Station': cells[1].text.strip(),          
                             'Status': cells[2].text.strip(),           
                             'OFD': cells[3].text.strip(),             
-                            'SIM': cells[5].text.strip(),
-                            'Business_Type': cells[6].text.strip(),                          
-                            'Chain': cells[13].text.strip(),          
-                            'A Owner': cells[14].text.strip(),        
-                            'Category': cells[18].text.strip(),
-                            'Type': cells[18].text.strip(),
+                            'Business_Type': cells[5].text.strip(),                          
+                            'Chain': cells[8].text.strip(),          
+                            'A Owner': cells[9].text.strip(),        
+                            'Category': cells[12].text.strip(),
+                            'Type': cells[12].text.strip(),
                             'Timestamp': timestamp
                         }
                         # Additional check to filter out header row values
@@ -1195,7 +1194,7 @@ def main():
     st.markdown(
         """
         <div style='text-align: center'>
-            <p>JC Tracker Data Analysis Tool v1.0 | Last Updated: December 2025</p>
+            <p>JC Tracker Data Analysis Tool v1.0 | Last Updated: October 2025</p>
         </div>
         """,
         unsafe_allow_html=True
