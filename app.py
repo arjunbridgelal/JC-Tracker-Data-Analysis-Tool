@@ -17,16 +17,61 @@ from openpyxl.styles import Font, Alignment, PatternFill
 API_TOKEN = 'ZE1HOU1BcE9UNVk=|1782085439|ygCv5CrNibKxK1yz4beV84m4h6KMVD8Zf2ae/KCP33o='
 BASE_URL = 'https://platform.quip-amazon.com'
 QUIP_SOURCES = {
-    '2025_Q1': {'id': 'tP7kA63aBaaR', 'name': 'JC Q1 2025'},
-    '2025_Q2': {'id': 'BbaaAYz9OOQ7', 'name': 'JC Q2 2025'},
-    '2025_Q3': {'id': 'b0w8Awc6xyjW', 'name': 'JC Q3 2025'},
-    '2025_Q4': {'id': 'o3q3AgLHlYn2', 'name': 'JC Q4 2025'},
-    # 2026 Sources
-    '2026_Q1': {'id': 'IvhXAG3KcCug', 'name': 'JC Q1 2026'},
-    '2026_Q2': {'id': 'SFxdAl8S3zc3', 'name': 'JC Q2 2026'},
-    '2026_Q3': {'id': 'Un2jA4qLCYaO', 'name': 'JC Q3 2026'},
-    '2026_Q4': {'id': '9RajAh6HjK6a', 'name': 'JC Q4 2026'}
+    'Q1': {'id': 'tP7kA63aBaaR', 'name': 'JC Q1'},
+    'Q2': {'id': 'BbaaAYz9OOQ7', 'name': 'JC Q2'},
+    'Q3': {'id': 'b0w8Awc6xyjW', 'name': 'JC Q3'},
+    'Q4': {'id': 'o3q3AgLHlYn2', 'name': 'JC Q4'}
 }
+
+# Column configuration for dynamic detection
+COLUMN_CONFIG = {
+    'Station': {
+        'headers': ['station', 'site', 'location', 'ds', 'site code', 'station code'],
+        'pattern': r'^[A-Z]{2,4}\d{1,2}$',
+        'required': True
+    },
+    'Status': {
+        'headers': ['status', 'state', 'progress', 'task status'],
+        'pattern': r'^(Complete|In Progress|Blocked|Published|Merged|Not Started|Pending|Done)$',
+        'required': True
+    },
+    'OFD': {
+        'headers': ['ofd', 'ofd date', 'launch', 'launch date', 'go live', 'target date'],
+        'pattern': r'^\d{1,2}[/-]\d{1,2}([/-]\d{2,4})?$',
+        'required': False
+    },
+    'SIM': {
+        'headers': ['sim', 'sim #', 'sim number', 'ticket', 'sim id', 'ticket #', 'ticket id'],
+        'pattern': r'^(SIM-?\d+|tt/\d+|[A-Z]+-\d+|D\d+)$',
+        'required': False
+    },
+    'Business_Type': {
+        'headers': ['business type', 'business_type', 'biz type', 'business', 'biz'],
+        'pattern': None,
+        'required': False
+    },
+    'Chain': {
+        'headers': ['chain', 'chain name', 'program', 'program name'],
+        'pattern': None,
+        'required': False
+    },
+    'A Owner': {
+        'headers': ['a owner', 'owner', 'assignee', 'assigned to', 'specialist', 'assigned', 'poc'],
+        'pattern': None,
+        'required': True
+    },
+    'Category': {
+        'headers': ['category', 'cat', 'task category'],
+        'pattern': None,
+        'required': False
+    },
+    'Type': {
+        'headers': ['type', 'task type', 'work type', 'item type'],
+        'pattern': None,
+        'required': False
+    }
+}
+
 
 def fetch_quip_data(quarter):
     """Fetch data from QUIP"""
@@ -52,6 +97,7 @@ def fetch_quip_data(quarter):
         st.error(f"Error connecting to QUIP: {str(e)}")
         return None
 
+
 def get_available_tables(quip_data):
     """Get list of available tables/tabs from QUIP data"""
     soup = BeautifulSoup(quip_data['html'], 'html.parser')
@@ -60,17 +106,158 @@ def get_available_tables(quip_data):
     table_titles = []
     for table in tables:
         title = table.get('title', '').strip()
-        # Check how tables are titled in 2026 documents
-        print(f"Found table title: {title}")  # Add this for debugging
         if title.startswith('WK'):
             table_titles.append(title)
     
     return sorted(table_titles)
 
+
+def find_column_indices_by_header(header_cells):
+    """
+    Find column indices by matching header text to expected column names.
+    Returns a dictionary mapping field names to column indices.
+    """
+    column_indices = {}
+    header_texts = [cell.text.strip().lower() for cell in header_cells]
+    
+    for field_name, config in COLUMN_CONFIG.items():
+        expected_headers = config['headers']
+        
+        for idx, header_text in enumerate(header_texts):
+            # Check for exact match or partial match
+            if any(
+                expected == header_text or 
+                expected in header_text or 
+                header_text in expected
+                for expected in expected_headers
+            ):
+                if field_name not in column_indices:  # Don't overwrite if already found
+                    column_indices[field_name] = idx
+                    break
+    
+    return column_indices
+
+
+def find_column_indices_by_content(data_cells):
+    """
+    Find column indices by analyzing cell content patterns.
+    Used as fallback when header matching fails.
+    """
+    column_indices = {}
+    
+    for field_name, config in COLUMN_CONFIG.items():
+        pattern = config.get('pattern')
+        if pattern:
+            for idx, cell in enumerate(data_cells):
+                content = cell.text.strip()
+                if content and re.match(pattern, content, re.IGNORECASE):
+                    if field_name not in column_indices:
+                        column_indices[field_name] = idx
+                        break
+    
+    return column_indices
+
+
+def validate_column_indices(column_indices, sample_cells):
+    """
+    Validate detected column indices using content patterns.
+    Returns corrected indices if validation fails.
+    """
+    validated_indices = column_indices.copy()
+    
+    for field_name, idx in column_indices.items():
+        config = COLUMN_CONFIG.get(field_name, {})
+        pattern = config.get('pattern')
+        
+        if pattern and idx < len(sample_cells):
+            content = sample_cells[idx].text.strip()
+            
+            # If content doesn't match expected pattern, try to find correct column
+            if content and not re.match(pattern, content, re.IGNORECASE):
+                # Search for correct column by pattern
+                for i, cell in enumerate(sample_cells):
+                    cell_content = cell.text.strip()
+                    if cell_content and re.match(pattern, cell_content, re.IGNORECASE):
+                        validated_indices[field_name] = i
+                        break
+    
+    return validated_indices
+
+
+def detect_columns_hybrid(header_cells, sample_data_rows):
+    """
+    Hybrid column detection combining header matching and content analysis.
+    
+    Args:
+        header_cells: List of header cells from the table
+        sample_data_rows: List of sample data rows for content validation
+    
+    Returns:
+        Dictionary mapping field names to column indices
+    """
+    # Step 1: Try header-based matching
+    column_indices = find_column_indices_by_header(header_cells)
+    
+    # Step 2: Get sample data for validation
+    sample_cells = None
+    for row in sample_data_rows[:5]:  # Check first 5 rows for sample data
+        cells = row.find_all('td')
+        if len(cells) > 3:  # Make sure we have enough cells
+            # Skip if this looks like a header row
+            first_cell_text = cells[0].text.strip().lower() if cells else ''
+            if first_cell_text not in ['', 'station', 'site', '#']:
+                sample_cells = cells
+                break
+    
+    # Step 3: Validate and correct using content patterns
+    if sample_cells:
+        column_indices = validate_column_indices(column_indices, sample_cells)
+        
+        # Step 4: Fill in missing columns using content detection
+        content_indices = find_column_indices_by_content(sample_cells)
+        for field_name, idx in content_indices.items():
+            if field_name not in column_indices:
+                column_indices[field_name] = idx
+    
+    return column_indices
+
+
+def get_detection_report(column_indices, header_cells):
+    """
+    Generate a report of detected columns for debugging/display.
+    """
+    header_texts = [cell.text.strip() for cell in header_cells]
+    
+    report = []
+    for field_name, config in COLUMN_CONFIG.items():
+        if field_name in column_indices:
+            idx = column_indices[field_name]
+            header_text = header_texts[idx] if idx < len(header_texts) else "N/A"
+            status = "✅ Found"
+        else:
+            idx = "N/A"
+            header_text = "N/A"
+            status = "❌ Missing" if config['required'] else "⚠️ Not Found"
+        
+        report.append({
+            'Field': field_name,
+            'Status': status,
+            'Column Index': idx,
+            'Header Text': header_text,
+            'Required': '✓' if config['required'] else ''
+        })
+    
+    return pd.DataFrame(report)
+
+
 def parse_quip_data(quip_data_dict, selected_quarters, selected_weeks):
-    """Parse QUIP HTML content into DataFrame for selected quarters and weeks"""
+    """
+    Parse QUIP HTML content into DataFrame for selected quarters and weeks.
+    Uses hybrid column detection to handle varying column positions.
+    """
     all_data = []
     timestamp = datetime.now()
+    detection_reports = []
     
     for quarter, quip_data in quip_data_dict.items():
         soup = BeautifulSoup(quip_data['html'], 'html.parser')
@@ -80,30 +267,108 @@ def parse_quip_data(quip_data_dict, selected_quarters, selected_weeks):
             table_title = table.get('title', '').strip()
             if table_title in selected_weeks:
                 rows = table.find_all('tr')
-                # Skip the first row (header row)
+                
+                if len(rows) < 2:
+                    continue
+                
+                # Get header cells
+                header_cells = rows[0].find_all(['th', 'td'])
+                
+                # Detect columns using hybrid approach
+                column_indices = detect_columns_hybrid(header_cells, rows[1:])
+                
+                # Store detection report for first table (for display)
+                if not detection_reports:
+                    detection_reports.append({
+                        'quarter': quarter,
+                        'week': table_title,
+                        'report': get_detection_report(column_indices, header_cells),
+                        'indices': column_indices
+                    })
+                
+                # Check for required columns
+                missing_required = [
+                    field for field, config in COLUMN_CONFIG.items()
+                    if config['required'] and field not in column_indices
+                ]
+                
+                if missing_required:
+                    st.warning(f"Missing required columns in {quarter} - {table_title}: {', '.join(missing_required)}")
+                    continue
+                
+                # Process data rows
                 for row in rows[1:]:
                     cells = row.find_all('td')
-                    if len(cells) >= 19:
-                        row_data = {
-                            'Quarter': quarter,
-                            'Week': table_title,
-                            'Station': cells[1].text.strip(),          
-                            'Status': cells[2].text.strip(),           
-                            'OFD': cells[3].text.strip(),             
-                            'Business_Type': cells[6].text.strip(),                          
-                            'Chain': cells[13].text.strip(),          
-                            'A Owner': cells[14].text.strip(),        
-                            'Category': cells[17].text.strip(),
-                            'Type': cells[17].text.strip(),
-                            'Timestamp': timestamp
-                        }
-                        # Additional check to filter out header row values
-                        if (row_data['Station'] and 
-                            row_data['Status'].lower() != 'status' and 
-                            row_data['Type'].lower() != 'type'):
-                            all_data.append(row_data)
+                    
+                    if len(cells) < 2:
+                        continue
+                    
+                    # Build row data dynamically based on detected columns
+                    row_data = {
+                        'Quarter': quarter,
+                        'Week': table_title,
+                        'Timestamp': timestamp
+                    }
+                    
+                    # Extract data for each detected column
+                    for field_name, idx in column_indices.items():
+                        if idx < len(cells):
+                            row_data[field_name] = cells[idx].text.strip()
+                        else:
+                            row_data[field_name] = ''
+                    
+                    # Ensure all expected fields exist (even if empty)
+                    for field_name in COLUMN_CONFIG.keys():
+                        if field_name not in row_data:
+                            row_data[field_name] = ''
+                    
+                    # Validation: Skip header rows and empty rows
+                    station = row_data.get('Station', '')
+                    status = row_data.get('Status', '')
+                    
+                    if (station and 
+                        station.lower() not in ['station', 'site', ''] and
+                        status.lower() not in ['status', 'state', '']):
+                        all_data.append(row_data)
+    
+    # Store detection report in session state for display
+    if detection_reports:
+        st.session_state.column_detection_report = detection_reports
     
     return pd.DataFrame(all_data)
+
+
+def display_column_detection_info():
+    """Display column detection information in an expander"""
+    if 'column_detection_report' in st.session_state and st.session_state.column_detection_report:
+        report_data = st.session_state.column_detection_report[0]
+        
+        with st.expander("🔍 Column Detection Info", expanded=False):
+            st.markdown(f"**Sample from:** {report_data['quarter']} - {report_data['week']}")
+            
+            # Display the detection report
+            report_df = report_data['report']
+            
+            # Style the dataframe
+            def highlight_status(val):
+                if '✅' in str(val):
+                    return 'background-color: #d4edda'
+                elif '❌' in str(val):
+                    return 'background-color: #f8d7da'
+                elif '⚠️' in str(val):
+                    return 'background-color: #fff3cd'
+                return ''
+            
+            st.dataframe(
+                report_df.style.applymap(highlight_status, subset=['Status']),
+                use_container_width=True
+            )
+            
+            # Show raw indices mapping
+            st.markdown("**Detected Column Indices:**")
+            indices_str = ", ".join([f"{k}: {v}" for k, v in report_data['indices'].items()])
+            st.code(indices_str)
+
 
 def create_performance_ranking(df):
     """Create a ranked performance table for A Owners"""
@@ -178,8 +443,12 @@ def create_performance_ranking(df):
         st.error(f"Error in performance ranking calculation: {str(e)}")
         return pd.DataFrame()
 
+
 def display_status_comparison(df, selected_weeks):
     st.subheader("Status Comparison")
+    
+    # Display column detection info
+    display_column_detection_info()
     
     # Create overall status distribution chart and get its colors
     status_counts = df['Status'].value_counts().reset_index()
@@ -273,6 +542,7 @@ def display_status_comparison(df, selected_weeks):
         height=400
     )
 
+
 def display_weekly_details(df, selected_weeks):
     st.subheader("Weekly Details")
     
@@ -329,6 +599,7 @@ def display_weekly_details(df, selected_weeks):
                 })
                 .apply(lambda x: ['font-weight: bold' if x.name == 'Total' else '' for _ in x], axis=1)
             )
+
 
 def display_aowner_details(df):
     st.subheader("Specialist Details")
@@ -437,6 +708,7 @@ def display_aowner_details(df):
                 .apply(lambda x: ['font-weight: bold' if x.name == len(weekly_progress)-1 else '' for _ in x], axis=1)
             )
 
+
 def display_performance_rankings(df):
     st.subheader("Performance Rankings")
     
@@ -502,6 +774,7 @@ def display_performance_rankings(df):
         
         st.plotly_chart(fig, use_container_width=True)
 
+
 def display_raw_data(df):
     st.subheader("Raw Data")
     st.dataframe(df)
@@ -513,6 +786,7 @@ def display_raw_data(df):
         file_name=f"raw_data_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
         mime='text/csv',
     )
+
 
 def create_comprehensive_report(df, selected_weeks):
     """Create a comprehensive Excel report with tables and visualizations"""
@@ -668,6 +942,7 @@ def create_comprehensive_report(df, selected_weeks):
     
     return output
 
+
 def save_snapshot(df, description=""):
     """Save current data as a snapshot"""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M")
@@ -691,6 +966,7 @@ def save_snapshot(df, description=""):
     # Save snapshot
     st.session_state.snapshots[timestamp] = snapshot
     return timestamp
+
 
 def compare_snapshots(snapshot1_id, snapshot2_id):
     """Compare two snapshots and return differences"""
@@ -743,6 +1019,7 @@ def compare_snapshots(snapshot1_id, snapshot2_id):
     }
     
     return comparison
+
 
 def format_change(x, is_numeric=True):
     if not is_numeric:
@@ -983,6 +1260,7 @@ def display_comparison_results(comparison):
         use_container_width=True  # This makes the table use full width
     )
 
+
 def main():
     st.set_page_config(page_title="JC Tracker Data Analysis Tool", layout="wide", page_icon="📊")
     
@@ -1200,7 +1478,6 @@ def main():
         unsafe_allow_html=True
     )
 
+
 if __name__ == "__main__":
     main()
-
-    
